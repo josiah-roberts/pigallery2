@@ -306,8 +306,8 @@ export class FilterService {
               } = {};
 
               for (const item of c.media) {
-                const filteredOut = afilters.selectedFilters.reduce(
-                  (filteredOut, { type, options }) => {
+                const keep = afilters.selectedFilters.reduce(
+                  (keep, { type, options }) => {
                     const values = filters[type].mapFn(item as PhotoDTO) ?? [];
                     const counts = (filterValueCounts[type] =
                       filterValueCounts[type] ?? {});
@@ -319,17 +319,17 @@ export class FilterService {
                       }
                     }
                     return (
-                      filteredOut ||
+                      !keep ||
                       (values.length > 0 &&
                         !options.some(
                           ({ name, selected }) =>
-                            selected && !values.includes(name)
+                            selected && values.includes(name)
                         ))
                     );
                   },
-                  false
+                  true
                 );
-                if (!filteredOut) {
+                if (keep) {
                   yield item;
                 }
               }
@@ -348,6 +348,8 @@ export class FilterService {
                 (option) => filterValueCounts[filter.type]?.[option.name]
               );
             }
+
+            console.info(afilters.selectedFilters)
 
             c.media = filteredMedia;
             return c;
