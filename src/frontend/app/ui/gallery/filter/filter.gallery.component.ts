@@ -47,13 +47,13 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
   filterChanged(index: number, newFilter: Filter) {
     this.filterService.filterState.value.selectedFilters[index] = {
       type: newFilter.key,
-      options: {}
+      options: []
     }
     this.filterService.onFilterChange();
   }
 
-  toggleFilterValue(filter: SelectedFilter, value: string) {
-    filter.options[value] = !filter.options[value];
+  toggleFilterValue(option: {selected: boolean}) {
+    option.selected = !option.selected
     this.filterService.onFilterChange();
   }
 
@@ -71,8 +71,8 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
   }
 
   isOnlySelected(filter: SelectedFilter, option: string): boolean {
-    const selectedEntries = Object.entries(filter.options).filter(([, selected]) => selected);
-    return selectedEntries.length === 1 && filter.options[option];
+    const selectedEntries = filter.options.filter(({selected}) => selected);
+    return selectedEntries.length === 1 && selectedEntries[0].name === option;
   }
 
   toggleSelectOnly(
@@ -81,9 +81,9 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
       event: MouseEvent
   ): void {
     if (this.isOnlySelected(filter, option)) {
-      Object.keys(filter.options).forEach((o) => filter.options[o] = true);
+      filter.options.forEach((o) => o.selected = true);
     } else {
-      Object.keys(filter.options).forEach((o) => filter.options[o] = o === option);
+      filter.options.forEach((o) => o.selected = o.name === option);
     }
     event.stopPropagation();
     this.filterService.onFilterChange();

@@ -109,7 +109,7 @@ export interface Filter {
 
 export interface SelectedFilter {
   type: FilterType;
-  options: Record<string, boolean>;
+  options: Array<{name: string, selected: boolean}>;
 }
 
 @Injectable()
@@ -126,19 +126,19 @@ export class FilterService {
     selectedFilters: [
       {
         type: 'keywords',
-        options: {},
+        options: [],
       },
       {
         type: 'faces',
-        options: {},
+        options: [],
       },
       {
         type: 'city',
-        options: {},
+        options: [],
       },
       {
         type: 'rating',
-        options: {},
+        options: [],
       },
     ],
     filterValueCounts: {},
@@ -370,11 +370,11 @@ export class FilterService {
 
                     for (const value of values) {
                       counts[value] = (counts[value] ?? 0) + 1;
-                      if (options[value] === undefined) {
-                        options[value] = true; // Add any unknown values to the filter
+                      if (options.find(x => x.name === value) === undefined) {
+                        options.push({name: value, selected: true}); // Add any unknown values to the filter
                       }
                     }
-                    return filteredOut || values.every((v) => !options[v]);
+                    return filteredOut || values.every((v) => !options.some(({name, selected}) => selected && name === v));
                 
                   },
                   false
@@ -389,12 +389,8 @@ export class FilterService {
             afilters.filterValueCounts = filterValueCounts;
             afilters.areFiltersActive =
               c.media.length !== dirContent.media.length;
-            for (const {type, options} of afilters.selectedFilters) {
-              for (const option of Object.keys(options)) {
-                if (!filterValueCounts[type]?.[option]) {
-                  delete options[option]
-                }
-              }
+            for (const filter of afilters.selectedFilters) {
+              filter.options = filter.options.filter((option) => filterValueCounts[filter.type]?.[option.name])
             }
 
             return c;
@@ -425,7 +421,7 @@ export class FilterService {
   resetFilters(triggerChangeDetection = true): void {
     this.filterState.value.dateFilter.minFilter = Number.MIN_VALUE;
     this.filterState.value.dateFilter.maxFilter = Number.MAX_VALUE;
-    this.filterState.value.selectedFilters.forEach((f) => (f.options = {}));
+    this.filterState.value.selectedFilters.forEach((f) => (f.options = []));
     if (triggerChangeDetection) {
       this.onFilterChange();
     }

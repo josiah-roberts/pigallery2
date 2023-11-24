@@ -95,11 +95,11 @@
                   [ngValue]="f">{{f.name}}</option>
         </select>
         <div class="filter-column">
-          <ul class="list-group" *ngIf="options(filter).length > 0">
+          <ul class="list-group" *ngIf="filter.options.length > 0">
             <li
-              *ngFor="let option of options(filter)"
-              [class.unselected]="!filter.options.selected"
-              (click)="toggleFilterValue(filter, option.name)"
+              *ngFor="let option of filter.options"
+              [class.unselected]="!option.selected"
+              (click)="toggleFilterValue(option)"
               class="filter-option list-group-item list-group-item-action d-flex justify-content-between align-items-center">
 
               <div>
