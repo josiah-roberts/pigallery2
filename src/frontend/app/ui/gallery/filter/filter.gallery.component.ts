@@ -22,25 +22,25 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
 
   get MinDatePrc(): number {
     return (
-        ((this.ActiveFilters.dateFilter.minFilter -
-                this.ActiveFilters.dateFilter.minDate) /
-            (this.ActiveFilters.dateFilter.maxDate -
-                this.ActiveFilters.dateFilter.minDate)) *
+        ((this.FilterState.dateFilter.minFilter -
+                this.FilterState.dateFilter.minDate) /
+            (this.FilterState.dateFilter.maxDate -
+                this.FilterState.dateFilter.minDate)) *
         100
     );
   }
 
   get MaxDatePrc(): number {
     return (
-        ((this.ActiveFilters.dateFilter.maxFilter -
-                this.ActiveFilters.dateFilter.minDate) /
-            (this.ActiveFilters.dateFilter.maxDate -
-                this.ActiveFilters.dateFilter.minDate)) *
+        ((this.FilterState.dateFilter.maxFilter -
+                this.FilterState.dateFilter.minDate) /
+            (this.FilterState.dateFilter.maxDate -
+                this.FilterState.dateFilter.minDate)) *
         100
     );
   }
 
-  get ActiveFilters(): FilterState {
+  get FilterState(): FilterState {
     return this.filterService.filterState.value;
   }
 
@@ -86,16 +86,16 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
 
   newMinDate($event: Event): void {
     const diff =
-        (this.ActiveFilters.dateFilter.maxDate -
-            this.ActiveFilters.dateFilter.minDate) *
+        (this.FilterState.dateFilter.maxDate -
+            this.FilterState.dateFilter.minDate) *
         0.01;
     if (
-        this.ActiveFilters.dateFilter.minFilter >
-        this.ActiveFilters.dateFilter.maxFilter - diff
+        this.FilterState.dateFilter.minFilter >
+        this.FilterState.dateFilter.maxFilter - diff
     ) {
-      this.ActiveFilters.dateFilter.minFilter = Math.max(
-          this.ActiveFilters.dateFilter.maxFilter - diff,
-          this.ActiveFilters.dateFilter.minDate
+      this.FilterState.dateFilter.minFilter = Math.max(
+          this.FilterState.dateFilter.maxFilter - diff,
+          this.FilterState.dateFilter.minDate
       );
     }
     this.filterService.onFilterChange();
@@ -103,16 +103,16 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
 
   newMaxDate($event: Event): void {
     const diff =
-        (this.ActiveFilters.dateFilter.maxDate -
-            this.ActiveFilters.dateFilter.minDate) *
+        (this.FilterState.dateFilter.maxDate -
+            this.FilterState.dateFilter.minDate) *
         0.01;
     if (
-        this.ActiveFilters.dateFilter.maxFilter <
-        this.ActiveFilters.dateFilter.minFilter + diff
+        this.FilterState.dateFilter.maxFilter <
+        this.FilterState.dateFilter.minFilter + diff
     ) {
-      this.ActiveFilters.dateFilter.maxFilter = Math.min(
-          this.ActiveFilters.dateFilter.minFilter + diff,
-          this.ActiveFilters.dateFilter.maxDate
+      this.FilterState.dateFilter.maxFilter = Math.min(
+          this.FilterState.dateFilter.minFilter + diff,
+          this.FilterState.dateFilter.maxDate
       );
     }
     this.filterService.onFilterChange();
