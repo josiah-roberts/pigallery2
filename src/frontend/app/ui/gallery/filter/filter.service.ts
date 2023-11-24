@@ -3,10 +3,99 @@ import {BehaviorSubject, Observable} from 'rxjs';
 import {PhotoDTO} from '../../../../../common/entities/PhotoDTO';
 import {DirectoryContent} from '../contentLoader.service';
 import {debounceTime, map, switchMap} from 'rxjs/operators';
+import { Filters } from 'fluent-ffmpeg';
 
 export enum FilterRenderType {
   enum = 1,
   range = 2,
+}
+
+const filters = {
+  keywords: {
+    key: 'keywords',
+    name: $localize`Keywords`,
+    mapFn: (m: PhotoDTO): string[] => m.metadata.keywords,
+    renderType: FilterRenderType.enum,
+    isArrayValue: true,
+  },
+ faces: {
+  key: 'faces',
+    name: $localize`Faces`,
+    mapFn: (m: PhotoDTO): string[] =>
+      m.metadata.faces
+        ? m.metadata.faces.map((f) => f.name)
+        : ['<' + $localize`no face` + '>'],
+    renderType: FilterRenderType.enum,
+    isArrayValue: true,
+  },
+  faces_groups: {
+    key: 'faces_groups',
+    name: $localize`Faces groups`,
+    mapFn: (m: PhotoDTO): string =>
+      m.metadata.faces
+        ?.map((f) => f.name)
+        .sort()
+        .join(', '),
+    renderType: FilterRenderType.enum,
+    isArrayValue: false,
+  },
+  caption: {
+    key: 'caption',
+    name: $localize`Caption`,
+    mapFn: (m: PhotoDTO): string => m.metadata.caption,
+    renderType: FilterRenderType.enum,
+  },
+  rating: {
+    key: 'rating',
+    name: $localize`Rating`,
+    mapFn: (m: PhotoDTO): string => String(m.metadata.rating),
+    renderType: FilterRenderType.enum,
+  },
+ camera: {
+  key: 'camera',
+    name: $localize`Camera`,
+    mapFn: (m: PhotoDTO): string => m.metadata.cameraData?.model,
+    renderType: FilterRenderType.enum,
+  },
+  lens: {
+    key: 'lens',
+    name: $localize`Lens`,
+    mapFn: (m: PhotoDTO): string => m.metadata.cameraData?.lens,
+    renderType: FilterRenderType.enum,
+  },
+ city: {
+  key: 'city',
+    name: $localize`City`,
+    mapFn: (m: PhotoDTO): string => m.metadata.positionData?.city,
+    renderType: FilterRenderType.enum,
+  },
+  state: {
+    key: 'state',
+    name: $localize`State`,
+    mapFn: (m: PhotoDTO): string => m.metadata.positionData?.state,
+    renderType: FilterRenderType.enum,
+  },
+  country: {
+    key: 'country',
+    name: $localize`Country`,
+    mapFn: (m: PhotoDTO): string => m.metadata.positionData?.country,
+    renderType: FilterRenderType.enum,
+  },
+} as const;
+
+type ActiveFilters = {
+  filtersVisible: boolean;
+  areFiltersActive: boolean;
+  dateFilter: {
+    minDate: number;
+  maxDate: number;
+  minFilter: number;
+  maxFilter: number;
+  };
+  selectedFilters: {
+    type: keyof typeof filters;
+    options: Record<string, boolean>;
+  }[]
 }
 
 export interface Filter {
@@ -29,70 +118,7 @@ export interface SelectedFilter {
 
 @Injectable()
 export class FilterService {
-  public readonly AVAILABLE_FILTERS: Filter[] = [
-    {
-      name: $localize`Keywords`,
-      mapFn: (m: PhotoDTO): string[] => m.metadata.keywords,
-      renderType: FilterRenderType.enum,
-      isArrayValue: true,
-    },
-    {
-      name: $localize`Faces`,
-      mapFn: (m: PhotoDTO): string[] =>
-        m.metadata.faces
-          ? m.metadata.faces.map((f) => f.name)
-          : ['<' + $localize`no face` + '>'],
-      renderType: FilterRenderType.enum,
-      isArrayValue: true,
-    },
-    {
-      name: $localize`Faces groups`,
-      mapFn: (m: PhotoDTO): string =>
-        m.metadata.faces
-          ?.map((f) => f.name)
-          .sort()
-          .join(', '),
-      renderType: FilterRenderType.enum,
-      isArrayValue: false,
-    },
-    {
-      name: $localize`Caption`,
-      mapFn: (m: PhotoDTO): string => m.metadata.caption,
-      renderType: FilterRenderType.enum,
-    },
-    {
-      name: $localize`Rating`,
-      mapFn: (m: PhotoDTO): number => m.metadata.rating,
-      renderType: FilterRenderType.enum,
-    },
-    {
-      name: $localize`Camera`,
-      mapFn: (m: PhotoDTO): string => m.metadata.cameraData?.model,
-      renderType: FilterRenderType.enum,
-    },
-    {
-      name: $localize`Lens`,
-      mapFn: (m: PhotoDTO): string => m.metadata.cameraData?.lens,
-      renderType: FilterRenderType.enum,
-    },
-    {
-      name: $localize`City`,
-      mapFn: (m: PhotoDTO): string => m.metadata.positionData?.city,
-      renderType: FilterRenderType.enum,
-    },
-    {
-      name: $localize`State`,
-      mapFn: (m: PhotoDTO): string => m.metadata.positionData?.state,
-      renderType: FilterRenderType.enum,
-    },
-    {
-      name: $localize`Country`,
-      mapFn: (m: PhotoDTO): string => m.metadata.positionData?.country,
-      renderType: FilterRenderType.enum,
-    },
-  ];
-
-  public readonly activeFilters = new BehaviorSubject({
+  public readonly activeFilters = new BehaviorSubject<ActiveFilters>({
     filtersVisible: false,
     areFiltersActive: false,
     dateFilter: {
@@ -103,20 +129,20 @@ export class FilterService {
     },
     selectedFilters: [
       {
-        filter: this.AVAILABLE_FILTERS[0],
-        options: [],
+        type: 'keywords',
+        options: {},
       },
       {
-        filter: this.AVAILABLE_FILTERS[1],
-        options: [],
+        type: 'faces',
+        options: {},
       },
       {
-        filter: this.AVAILABLE_FILTERS[7],
-        options: [],
+        type: 'city',
+        options: {},
       },
       {
-        filter: this.AVAILABLE_FILTERS[4],
-        options: [],
+        type: 'rating',
+        options: {},
       },
     ],
   });
@@ -233,6 +259,8 @@ export class FilterService {
               return dirContent;
             }
 
+
+
             // clone, so the original won't get overwritten
             const c = {
               media: dirContent.media,
@@ -275,39 +303,42 @@ export class FilterService {
               afilters.dateFilter.maxFilter = Number.MAX_VALUE;
             }
 
+            // this needs to:
+            // Build an array with all of the selected filter values for all of the media
+            // Build a map with the counts of all of the selected filter values for all of the media
+            // Build a map with all of the filter selections, including considering the unknown ones
+            // Finally, filter the media accordingly
+            // And update the filter selections with those defaults
+
+            const valueMap = new Map(afilters.selectedFilters.map(({type})=> {
+              const valuesForThisMedia = c.media.flatMap(media => {
+                const valuesForThisFilter = filters[type].mapFn(media as PhotoDTO);
+                return Array.isArray(valuesForThisFilter) ? valuesForThisFilter : [valuesForThisFilter];
+              })
+              const counts = new Map<string, number>();
+              for (const value of valuesForThisMedia) {
+                counts.set(value, (counts.get(value) ?? 0) + 1)
+              }
+              return [type, counts] as const;
+            }));
+
+            // If any options exist that are not in the current selection, default
+            // them to selected.
+            const selectedOptions = new Map(afilters.selectedFilters.map(f => [f.type, ({
+              ...Object.fromEntries([...valueMap.get(f.type).keys()].map(([k]) => [k, true])),
+              ...f.options,
+            })]));
+
+   
+
             // filters
             for (const f of afilters.selectedFilters) {
-
-              /* Update filter options */
-              const valueMap: { [key: string]: any } = {};
-              f.options.forEach((o) => {
-                valueMap[o.name] = o;
-                o.count = 0; // reset count so unknown option can be removed at the end
-              });
-
-              if (f.filter.isArrayValue) {
-                c.media.forEach((m) => {
-                  (f.filter.mapFn(m as PhotoDTO) as string[])?.forEach((v) => {
-                    valueMap[v] = valueMap[v] || {
-                      name: v,
-                      count: 0,
-                      selected: true,
-                    };
-                    valueMap[v].count++;
-                  });
-                });
-              } else {
-                c.media.forEach((m) => {
-                  const key = f.filter.mapFn(m as PhotoDTO) as string;
-                  valueMap[key] = valueMap[key] || {
-                    name: key,
-                    count: 0,
-                    selected: true,
-                  };
-                  valueMap[key].count++;
-                });
-              }
-
+              c.media = c.media.filter(media => {
+                const valuesForThisFilter = filters[f.type].mapFn(media as PhotoDTO);
+                const normalizedArray = Array.isArray(valuesForThisFilter) ? valuesForThisFilter : [valuesForThisFilter];
+                return selectedOptions.get(f.type)?.
+              })
+            
               f.options = Object.values(valueMap)
                 .filter((o) => o.count > 0)
                 .sort((a, b) => b.count - a.count);
