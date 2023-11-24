@@ -1,9 +1,10 @@
-import {Injectable} from '@angular/core';
-import {BehaviorSubject, Observable} from 'rxjs';
-import {PhotoDTO} from '../../../../../common/entities/PhotoDTO';
-import {DirectoryContent} from '../contentLoader.service';
-import {debounceTime, map, switchMap} from 'rxjs/operators';
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { PhotoDTO } from '../../../../../common/entities/PhotoDTO';
+import { DirectoryContent } from '../contentLoader.service';
+import { debounceTime, map, switchMap } from 'rxjs/operators';
 import { Filters } from 'fluent-ffmpeg';
+import { debug } from 'console';
 
 export enum FilterRenderType {
   enum = 1,
@@ -14,14 +15,14 @@ const filters = {
   keywords: {
     key: 'keywords',
     name: $localize`Keywords`,
-    mapFn: (m: PhotoDTO): string[] => m.metadata.keywords,
+    mapFn: (m: PhotoDTO): string[] | undefined => m.metadata.keywords,
     renderType: FilterRenderType.enum,
     isArrayValue: true,
   },
- faces: {
-  key: 'faces',
+  faces: {
+    key: 'faces',
     name: $localize`Faces`,
-    mapFn: (m: PhotoDTO): string[] =>
+    mapFn: (m: PhotoDTO) => 
       m.metadata.faces
         ? m.metadata.faces.map((f) => f.name)
         : ['<' + $localize`no face` + '>'],
@@ -31,94 +32,89 @@ const filters = {
   faces_groups: {
     key: 'faces_groups',
     name: $localize`Faces groups`,
-    mapFn: (m: PhotoDTO): string =>
+    mapFn: (m: PhotoDTO): string[] | undefined => [
       m.metadata.faces
         ?.map((f) => f.name)
         .sort()
         .join(', '),
+    ],
     renderType: FilterRenderType.enum,
     isArrayValue: false,
   },
   caption: {
     key: 'caption',
     name: $localize`Caption`,
-    mapFn: (m: PhotoDTO): string => m.metadata.caption,
+    mapFn: (m: PhotoDTO) => [m.metadata.caption],
     renderType: FilterRenderType.enum,
   },
   rating: {
     key: 'rating',
     name: $localize`Rating`,
-    mapFn: (m: PhotoDTO): string => String(m.metadata.rating),
+    mapFn: (m: PhotoDTO) => [String(m.metadata.rating ?? '<unknown>')],
     renderType: FilterRenderType.enum,
   },
- camera: {
-  key: 'camera',
+  camera: {
+    key: 'camera',
     name: $localize`Camera`,
-    mapFn: (m: PhotoDTO): string => m.metadata.cameraData?.model,
+    mapFn: (m: PhotoDTO) => [m.metadata.cameraData?.model],
     renderType: FilterRenderType.enum,
   },
   lens: {
     key: 'lens',
     name: $localize`Lens`,
-    mapFn: (m: PhotoDTO): string => m.metadata.cameraData?.lens,
+    mapFn: (m: PhotoDTO) => [m.metadata.cameraData?.lens],
     renderType: FilterRenderType.enum,
   },
- city: {
-  key: 'city',
+  city: {
+    key: 'city',
     name: $localize`City`,
-    mapFn: (m: PhotoDTO): string => m.metadata.positionData?.city,
+    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.city ?? '<unknown>'],
     renderType: FilterRenderType.enum,
   },
   state: {
     key: 'state',
     name: $localize`State`,
-    mapFn: (m: PhotoDTO): string => m.metadata.positionData?.state,
+    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.state],
     renderType: FilterRenderType.enum,
   },
   country: {
     key: 'country',
     name: $localize`Country`,
-    mapFn: (m: PhotoDTO): string => m.metadata.positionData?.country,
+    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.country],
     renderType: FilterRenderType.enum,
   },
 } as const;
 
-type ActiveFilters = {
+export type FilterState = {
   filtersVisible: boolean;
   areFiltersActive: boolean;
   dateFilter: {
     minDate: number;
-  maxDate: number;
-  minFilter: number;
-  maxFilter: number;
+    maxDate: number;
+    minFilter: number;
+    maxFilter: number;
   };
-  selectedFilters: {
-    type: keyof typeof filters;
-    options: Record<string, boolean>;
-  }[]
-}
+  selectedFilters: SelectedFilter[];
+  filterValueCounts: { [k in FilterType]?: Record<string, number | undefined> };
+};
+export type FilterType = keyof typeof filters;
 
 export interface Filter {
+  key: FilterType;
   name: string;
   mapFn: (m: PhotoDTO) => (string | number)[] | (string | number);
   renderType: FilterRenderType;
   isArrayValue?: boolean;
 }
 
-export interface FilterOption {
-  name: string;
-  count: number;
-  selected: boolean;
-}
-
 export interface SelectedFilter {
-  filter: Filter;
-  options: FilterOption[];
+  type: FilterType;
+  options: Record<string, boolean>;
 }
 
 @Injectable()
 export class FilterService {
-  public readonly activeFilters = new BehaviorSubject<ActiveFilters>({
+  public readonly filterState = new BehaviorSubject<FilterState>({
     filtersVisible: false,
     areFiltersActive: false,
     dateFilter: {
@@ -145,16 +141,38 @@ export class FilterService {
         options: {},
       },
     ],
+    filterValueCounts: {},
   });
-  public statistic: { date: Date; endDate: Date; dateStr: string; count: number; max: number; }[] = [];
+  public statistic: {
+    date: Date;
+    endDate: Date;
+    dateStr: string;
+    count: number;
+    max: number;
+  }[] = [];
 
-  private getStatistic(prefiltered: DirectoryContent): { date: Date, endDate: Date, dateStr: string, count: number, max: number }[] {
-    if (!prefiltered ||
-      !prefiltered.media ||
-      prefiltered.media.length === 0) {
+  public filters = Object.values(filters);
+  public filtersMap = filters;
+  
+  private getStatistic(
+    prefiltered: DirectoryContent
+  ): {
+    date: Date;
+    endDate: Date;
+    dateStr: string;
+    count: number;
+    max: number;
+  }[] {
+    if (!prefiltered || !prefiltered.media || prefiltered.media.length === 0) {
       return [];
     }
-    const ret: { date: Date, endDate: Date, dateStr: string, count: number, max: number }[] = [];
+    const ret: {
+      date: Date;
+      endDate: Date;
+      dateStr: string;
+      count: number;
+      max: number;
+    }[] = [];
     const minDate = prefiltered.media.reduce(
       (p, curr) => Math.min(p, curr.metadata.creationDate),
       Number.MAX_VALUE - 1
@@ -189,31 +207,48 @@ export class FilterService {
     const floorDate = (ts: number): number => {
       let d = new Date(ts);
       if (usedDiv >= Y) {
-        const fy = (d.getFullYear());
-        d = new Date(fy - fy % (usedDiv / Y), 0, 1);
+        const fy = d.getFullYear();
+        d = new Date(fy - (fy % (usedDiv / Y)), 0, 1);
       } else if (usedDiv === M) {
         d = new Date(d.getFullYear(), d.getMonth(), 1);
       } else {
-        d = new Date(ts - ts % usedDiv);
+        d = new Date(ts - (ts % usedDiv));
       }
       return d.getTime();
     };
 
     const startMediaDate = new Date(floorDate(minDate));
 
-    prefiltered.media.forEach(m => {
-      const key = Math.floor((floorDate(m.metadata.creationDate) - startMediaDate.getTime()) / 1000 / usedDiv);
+    prefiltered.media.forEach((m) => {
+      const key = Math.floor(
+        (floorDate(m.metadata.creationDate) - startMediaDate.getTime()) /
+          1000 /
+          usedDiv
+      );
 
       const getDate = (index: number) => {
         let d: Date;
         if (usedDiv >= Y) {
-          d = new Date(startMediaDate.getFullYear() + (index * (usedDiv / Y)), 0, 1);
+          d = new Date(
+            startMediaDate.getFullYear() + index * (usedDiv / Y),
+            0,
+            1
+          );
         } else if (usedDiv === M) {
-          d = new Date(startMediaDate.getFullYear(), startMediaDate.getMonth() + index, 1);
+          d = new Date(
+            startMediaDate.getFullYear(),
+            startMediaDate.getMonth() + index,
+            1
+          );
         } else if (usedDiv === D) {
-          d = new Date(startMediaDate.getFullYear(), startMediaDate.getMonth(), startMediaDate.getDate() + index, 1);
+          d = new Date(
+            startMediaDate.getFullYear(),
+            startMediaDate.getMonth(),
+            startMediaDate.getDate() + index,
+            1
+          );
         } else {
-          d = (new Date(startMediaDate.getTime() + (index * usedDiv * 1000)));
+          d = new Date(startMediaDate.getTime() + index * usedDiv * 1000);
         }
         return d;
       };
@@ -230,7 +265,13 @@ export class FilterService {
         } else {
           dStr = 'HH';
         }
-        ret.push({date: getDate(ret.length), endDate: getDate(ret.length + 1), dateStr: dStr, count: 0, max: 0});
+        ret.push({
+          date: getDate(ret.length),
+          endDate: getDate(ret.length + 1),
+          dateStr: dStr,
+          count: 0,
+          max: 0,
+        });
       }
 
       ret[key].count++;
@@ -242,7 +283,7 @@ export class FilterService {
     }
 
     const max = ret.reduce((p, c) => Math.max(p, c.count), 0);
-    ret.forEach(v => v.max = max);
+    ret.forEach((v) => (v.max = max));
     return ret;
   }
 
@@ -252,14 +293,15 @@ export class FilterService {
     return directoryContent.pipe(
       switchMap((dirContent: DirectoryContent) => {
         this.statistic = this.getStatistic(dirContent);
-        this.resetFilters(false);
-        return this.activeFilters.pipe(
+        return this.filterState.pipe(
           map((afilters) => {
-            if (!dirContent || !dirContent.media || (!afilters.filtersVisible && !afilters.areFiltersActive)) {
+            if (
+              !dirContent ||
+              !dirContent.media ||
+              (!afilters.filtersVisible && !afilters.areFiltersActive)
+            ) {
               return dirContent;
             }
-
-
 
             // clone, so the original won't get overwritten
             const c = {
@@ -280,8 +322,10 @@ export class FilterService {
                 Number.MIN_VALUE + 1
               );
               // Add a few sec padding
-              afilters.dateFilter.minDate -= (afilters.dateFilter.minDate % 1000) + 1000;
-              afilters.dateFilter.maxDate += (afilters.dateFilter.maxDate % 1000) + 1000;
+              afilters.dateFilter.minDate -=
+                (afilters.dateFilter.minDate % 1000) + 1000;
+              afilters.dateFilter.maxDate +=
+                (afilters.dateFilter.maxDate % 1000) + 1000;
 
               if (afilters.dateFilter.minFilter === Number.MIN_VALUE) {
                 afilters.dateFilter.minFilter = afilters.dateFilter.minDate;
@@ -310,62 +354,49 @@ export class FilterService {
             // Finally, filter the media accordingly
             // And update the filter selections with those defaults
 
-            const valueMap = new Map(afilters.selectedFilters.map(({type})=> {
-              const valuesForThisMedia = c.media.flatMap(media => {
-                const valuesForThisFilter = filters[type].mapFn(media as PhotoDTO);
-                return Array.isArray(valuesForThisFilter) ? valuesForThisFilter : [valuesForThisFilter];
-              })
-              const counts = new Map<string, number>();
-              for (const value of valuesForThisMedia) {
-                counts.set(value, (counts.get(value) ?? 0) + 1)
-              }
-              return [type, counts] as const;
-            }));
+            // I think I can do *all* of this in one pass
 
-            // If any options exist that are not in the current selection, default
-            // them to selected.
-            const selectedOptions = new Map(afilters.selectedFilters.map(f => [f.type, ({
-              ...Object.fromEntries([...valueMap.get(f.type).keys()].map(([k]) => [k, true])),
-              ...f.options,
-            })]));
+            const filterValueCounts: {
+              [k in FilterType]?: Record<string, number | undefined>;
+            } = {};
 
-   
+            function* doFilter() {
+              for (const item of c.media) {
+                const filteredOut = afilters.selectedFilters.reduce(
+                  (filteredOut, { type, options }) => {
+                    const values = filters[type].mapFn(item as PhotoDTO) ?? [];
+                    const counts = (filterValueCounts[type] =
+                      filterValueCounts[type] ?? {});
 
-            // filters
-            for (const f of afilters.selectedFilters) {
-              c.media = c.media.filter(media => {
-                const valuesForThisFilter = filters[f.type].mapFn(media as PhotoDTO);
-                const normalizedArray = Array.isArray(valuesForThisFilter) ? valuesForThisFilter : [valuesForThisFilter];
-                return selectedOptions.get(f.type)?.
-              })
-            
-              f.options = Object.values(valueMap)
-                .filter((o) => o.count > 0)
-                .sort((a, b) => b.count - a.count);
-
-              /* Apply filters */
-              f.options.forEach((opt) => {
-                if (opt.selected) {
-                  return;
-                }
-                if (f.filter.isArrayValue) {
-                  c.media = c.media.filter((m) => {
-                    const mapped = f.filter.mapFn(m as PhotoDTO) as string[];
-                    if (!mapped) {
-                      return true;
+                    for (const value of values) {
+                      counts[value] = (counts[value] ?? 0) + 1;
+                      if (options[value] === undefined) {
+                        options[value] = true; // Add any unknown values to the filter
+                      }
                     }
-                    return mapped.indexOf(opt.name) === -1;
-                  });
-                } else {
-                  c.media = c.media.filter(
-                    (m) =>
-                      (f.filter.mapFn(m as PhotoDTO) as string) !== opt.name
-                  );
+                    return filteredOut || values.every((v) => !options[v]);
+                
+                  },
+                  false
+                );
+                if (!filteredOut) {
+                  yield item;
                 }
-              });
+              }
             }
-            // If the number of photos did not change, the filters are not active
-            afilters.areFiltersActive = c.media.length !== dirContent.media.length;
+
+            c.media = [...doFilter()];
+            afilters.filterValueCounts = filterValueCounts;
+            afilters.areFiltersActive =
+              c.media.length !== dirContent.media.length;
+            for (const {type, options} of afilters.selectedFilters) {
+              for (const option of Object.keys(options)) {
+                if (!filterValueCounts[type]?.[option]) {
+                  delete options[option]
+                }
+              }
+            }
+
             return c;
           })
         );
@@ -374,28 +405,29 @@ export class FilterService {
   }
 
   public onFilterChange(): void {
-    this.activeFilters.next(this.activeFilters.value);
+    this.filterState.next(this.filterState.value);
   }
 
   setShowingFilters(value: boolean): void {
-    if (this.activeFilters.value.filtersVisible === value) {
+    if (this.filterState.value.filtersVisible === value) {
       return;
     }
-    this.activeFilters.value.filtersVisible = value;
-    if ((!this.activeFilters.value.filtersVisible && !this.activeFilters.value.areFiltersActive)) {
+    this.filterState.value.filtersVisible = value;
+    if (
+      !this.filterState.value.filtersVisible &&
+      !this.filterState.value.areFiltersActive
+    ) {
       this.resetFilters(false);
     }
     this.onFilterChange();
   }
 
   resetFilters(triggerChangeDetection = true): void {
-    this.activeFilters.value.dateFilter.minFilter = Number.MIN_VALUE;
-    this.activeFilters.value.dateFilter.maxFilter = Number.MAX_VALUE;
-    this.activeFilters.value.selectedFilters.forEach((f) => (f.options = []));
+    this.filterState.value.dateFilter.minFilter = Number.MIN_VALUE;
+    this.filterState.value.dateFilter.maxFilter = Number.MAX_VALUE;
+    this.filterState.value.selectedFilters.forEach((f) => (f.options = {}));
     if (triggerChangeDetection) {
       this.onFilterChange();
     }
   }
 }
-
-

@@ -1,6 +1,6 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
 import {RouterLink} from '@angular/router';
-import {FilterOption, FilterService, SelectedFilter} from './filter.service';
+import { Filter, FilterService, FilterState, FilterType, SelectedFilter} from './filter.service';
 
 @Component({
   selector: 'app-gallery-filter',
@@ -40,20 +40,27 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
     );
   }
 
-  get ActiveFilters(): {
-    filtersVisible: boolean;
-    areFiltersActive: boolean;
-    dateFilter: {
-      minDate: number;
-      maxDate: number;
-      minFilter: number;
-      maxFilter: number;
-    };
-    selectedFilters: SelectedFilter[];
-  } {
-    return this.filterService.activeFilters.value;
+  get ActiveFilters(): FilterState {
+    return this.filterService.filterState.value;
   }
 
+  filterChanged(index: number, newFilter: Filter) {
+    this.filterService.filterState.value.selectedFilters[index] = {
+      type: newFilter.key,
+      options: {}
+    }
+    this.filterService.onFilterChange();
+  }
+
+  toggleFilterValue(filter: SelectedFilter, value: string) {
+    filter.options[value] = !filter.options[value];
+    this.filterService.onFilterChange();
+  }
+
+  options(filter: SelectedFilter) {
+    const entries = Object.entries(filter.options).map(([k, v]) => ({selected: v, name: k}))
+    return entries.sort((a, b) => this.filterService.filterState.value.filterValueCounts[filter.type][b.name] - this.filterService.filterState.value.filterValueCounts[filter.type][a.name])
+  }
 
   ngOnDestroy(): void {
     setTimeout(() => this.filterService.setShowingFilters(false));
@@ -63,30 +70,20 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
     this.filterService.setShowingFilters(true);
   }
 
-  isOnlySelected(filter: SelectedFilter, option: FilterOption): boolean {
-    for (const o of filter.options) {
-      if (o === option) {
-        if (o.selected === false) {
-          return false;
-        }
-      } else {
-        if (o.selected === true) {
-          return false;
-        }
-      }
-    }
-    return true;
+  isOnlySelected(filter: SelectedFilter, option: string): boolean {
+    const selectedEntries = Object.entries(filter.options).filter(([, selected]) => selected);
+    return selectedEntries.length === 1 && filter.options[option];
   }
 
   toggleSelectOnly(
       filter: SelectedFilter,
-      option: FilterOption,
+      option: string,
       event: MouseEvent
   ): void {
     if (this.isOnlySelected(filter, option)) {
-      filter.options.forEach((o) => (o.selected = true));
+      Object.keys(filter.options).forEach((o) => filter.options[o] = true);
     } else {
-      filter.options.forEach((o) => (o.selected = o === option));
+      Object.keys(filter.options).forEach((o) => filter.options[o] = o === option);
     }
     event.stopPropagation();
     this.filterService.onFilterChange();
