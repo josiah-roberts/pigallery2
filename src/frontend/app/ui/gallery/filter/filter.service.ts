@@ -43,7 +43,7 @@ const filters = {
   caption: {
     key: 'caption',
     name: $localize`Caption`,
-    mapFn: (m: PhotoDTO) => [m.metadata.caption],
+    mapFn: (m: PhotoDTO) => [m.metadata.caption ?? '<unknown>'],
     renderType: FilterRenderType.enum,
   },
   rating: {
@@ -55,13 +55,13 @@ const filters = {
   camera: {
     key: 'camera',
     name: $localize`Camera`,
-    mapFn: (m: PhotoDTO) => [m.metadata.cameraData?.model],
+    mapFn: (m: PhotoDTO) => [m.metadata.cameraData?.model ?? '<unknown>'],
     renderType: FilterRenderType.enum,
   },
   lens: {
     key: 'lens',
     name: $localize`Lens`,
-    mapFn: (m: PhotoDTO) => [m.metadata.cameraData?.lens],
+    mapFn: (m: PhotoDTO) => [m.metadata.cameraData?.lens ?? '<unknown>'],
     renderType: FilterRenderType.enum,
   },
   city: {
@@ -73,13 +73,13 @@ const filters = {
   state: {
     key: 'state',
     name: $localize`State`,
-    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.state],
+    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.state ?? '<unknown>'],
     renderType: FilterRenderType.enum,
   },
   country: {
     key: 'country',
     name: $localize`Country`,
-    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.country],
+    mapFn: (m: PhotoDTO) => [m.metadata.positionData?.country ?? '<unknown>'],
     renderType: FilterRenderType.enum,
   },
 } as const;

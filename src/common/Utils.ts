@@ -290,16 +290,15 @@ export class Utils {
 
   public static collect<TItem, TRet>(iter: Iterator<TItem, TRet>) {
     const values: TItem[] = [];
-    while (true) {
-      const nextValue = iter.next();
-  
-      if (!nextValue.done) {
+    let nextValue = iter.next();
+
+    while (!nextValue.done) {
         values.push(nextValue.value as TItem);
-      } else {
-        return [values, nextValue.value as TRet] as const;
-      }
+        nextValue = iter.next();
     }
-  }
+
+    return [values, nextValue.value as TRet] as const;
+}
 }
 
 export class LRU<V> {
