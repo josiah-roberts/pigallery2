@@ -57,11 +57,6 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
     this.filterService.onFilterChange();
   }
 
-  options(filter: SelectedFilter) {
-    const entries = Object.entries(filter.options).map(([k, v]) => ({selected: v, name: k}))
-    return entries.sort((a, b) => this.filterService.filterState.value.filterValueCounts[filter.type][b.name] - this.filterService.filterState.value.filterValueCounts[filter.type][a.name])
-  }
-
   ngOnDestroy(): void {
     setTimeout(() => this.filterService.setShowingFilters(false));
   }

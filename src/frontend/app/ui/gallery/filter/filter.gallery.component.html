@@ -117,7 +117,7 @@
               >{{filterService.filterState.value.filterValueCounts[filter.type]?.[option.name]}}</span>
             </li>
           </ul>
-          <div class="card-body text-center" *ngIf="options(filter).length === 0" i18n>Nothing to filter</div>
+          <div class="card-body text-center" *ngIf="filter.options.length === 0" i18n>Nothing to filter</div>
         </div>
       </div>
     </div>
