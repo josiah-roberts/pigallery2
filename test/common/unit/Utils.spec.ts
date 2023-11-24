@@ -62,7 +62,7 @@ describe('Utils', () => {
       for (const item of items) yield item;
       return ret;
     }
-    expect(Utils.collect(generator(['a', 'b'], 'z'))).to.be.equal([['a', 'b'], 'z'])
-    expect(Utils.collect(generator(['a', 'b']))).to.be.equal([['a', 'b'], undefined])
+    expect(Utils.collect(generator(['a', 'b'], 'z'))).to.deep.equal([['a', 'b'], 'z'])
+    expect(Utils.collect(generator(['a', 'b']))).to.deep.equal([['a', 'b'], undefined])
   })
 });
