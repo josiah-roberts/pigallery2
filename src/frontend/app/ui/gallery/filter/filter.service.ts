@@ -152,25 +152,15 @@ export class FilterService {
   public filters = Object.values(filters);
   public filtersMap = filters;
   
-  private getStatistic(
-    prefiltered: DirectoryContent
-  ): {
-    date: Date;
-    endDate: Date;
-    dateStr: string;
-    count: number;
-    max: number;
-  }[] {
-    if (!prefiltered || !prefiltered.media || prefiltered.media.length === 0) {
+  public statistic: { date: Date; endDate: Date; dateStr: string; count: number; max: number; }[] = [];
+
+  private getStatistic(prefiltered: DirectoryContent): { date: Date, endDate: Date, dateStr: string, count: number, max: number }[] {
+    if (!prefiltered ||
+      !prefiltered.media ||
+      prefiltered.media.length === 0) {
       return [];
     }
-    const ret: {
-      date: Date;
-      endDate: Date;
-      dateStr: string;
-      count: number;
-      max: number;
-    }[] = [];
+    const ret: { date: Date, endDate: Date, dateStr: string, count: number, max: number }[] = [];
     const minDate = prefiltered.media.reduce(
       (p, curr) => Math.min(p, curr.metadata.creationDate),
       Number.MAX_VALUE - 1
@@ -205,48 +195,31 @@ export class FilterService {
     const floorDate = (ts: number): number => {
       let d = new Date(ts);
       if (usedDiv >= Y) {
-        const fy = d.getFullYear();
-        d = new Date(fy - (fy % (usedDiv / Y)), 0, 1);
+        const fy = (d.getFullYear());
+        d = new Date(fy - fy % (usedDiv / Y), 0, 1);
       } else if (usedDiv === M) {
         d = new Date(d.getFullYear(), d.getMonth(), 1);
       } else {
-        d = new Date(ts - (ts % usedDiv));
+        d = new Date(ts - ts % usedDiv);
       }
       return d.getTime();
     };
 
     const startMediaDate = new Date(floorDate(minDate));
 
-    prefiltered.media.forEach((m) => {
-      const key = Math.floor(
-        (floorDate(m.metadata.creationDate) - startMediaDate.getTime()) /
-          1000 /
-          usedDiv
-      );
+    prefiltered.media.forEach(m => {
+      const key = Math.floor((floorDate(m.metadata.creationDate) - startMediaDate.getTime()) / 1000 / usedDiv);
 
       const getDate = (index: number) => {
         let d: Date;
         if (usedDiv >= Y) {
-          d = new Date(
-            startMediaDate.getFullYear() + index * (usedDiv / Y),
-            0,
-            1
-          );
+          d = new Date(startMediaDate.getFullYear() + (index * (usedDiv / Y)), 0, 1);
         } else if (usedDiv === M) {
-          d = new Date(
-            startMediaDate.getFullYear(),
-            startMediaDate.getMonth() + index,
-            1
-          );
+          d = new Date(startMediaDate.getFullYear(), startMediaDate.getMonth() + index, 1);
         } else if (usedDiv === D) {
-          d = new Date(
-            startMediaDate.getFullYear(),
-            startMediaDate.getMonth(),
-            startMediaDate.getDate() + index,
-            1
-          );
+          d = new Date(startMediaDate.getFullYear(), startMediaDate.getMonth(), startMediaDate.getDate() + index, 1);
         } else {
-          d = new Date(startMediaDate.getTime() + index * usedDiv * 1000);
+          d = (new Date(startMediaDate.getTime() + (index * usedDiv * 1000)));
         }
         return d;
       };
@@ -263,13 +236,7 @@ export class FilterService {
         } else {
           dStr = 'HH';
         }
-        ret.push({
-          date: getDate(ret.length),
-          endDate: getDate(ret.length + 1),
-          dateStr: dStr,
-          count: 0,
-          max: 0,
-        });
+        ret.push({date: getDate(ret.length), endDate: getDate(ret.length + 1), dateStr: dStr, count: 0, max: 0});
       }
 
       ret[key].count++;
@@ -281,7 +248,7 @@ export class FilterService {
     }
 
     const max = ret.reduce((p, c) => Math.max(p, c.count), 0);
-    ret.forEach((v) => (v.max = max));
+    ret.forEach(v => v.max = max);
     return ret;
   }
 
