@@ -44,9 +44,9 @@ export class GalleryFilterComponent implements OnInit, OnDestroy {
     return this.filterService.filterState.value;
   }
 
-  filterChanged(index: number, newFilter: Filter) {
+  filterChangedType(index: number, type: FilterType) {
     this.filterService.filterState.value.selectedFilters[index] = {
-      type: newFilter.key,
+      type,
       options: []
     }
     this.filterService.onFilterChange();

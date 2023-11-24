@@ -89,7 +89,7 @@
       <div class="col-12 col-md-6 col-lg-3 mt-2 mt-lg-1"
            *ngFor="let filter of ActiveFilters.selectedFilters; let i=index">
         <select [ngModel]="filterService.filtersMap[filter.type]"
-                (ngModelChange)="filterService.onFilterChange()"
+                (ngModelChange)="filterChangedType(i, $event.key)"
                 class="form-select" id="gallery-filter-{{i}}">
           <option *ngFor="let f of filterService.filters"
                   [ngValue]="f">{{f.name}}</option>
