@@ -3,6 +3,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { PhotoDTO } from '../../../../../common/entities/PhotoDTO';
 import { DirectoryContent } from '../contentLoader.service';
 import { map, switchMap } from 'rxjs/operators';
+import { Utils } from '../../../../../common/Utils';
 
 export enum FilterRenderType {
   enum = 1,
@@ -141,17 +142,10 @@ export class FilterService {
     ],
     filterValueCounts: {},
   });
-  public statistic: {
-    date: Date;
-    endDate: Date;
-    dateStr: string;
-    count: number;
-    max: number;
-  }[] = [];
 
   public filters = Object.values(filters);
   public filtersMap = filters;
-  
+
   public statistic: { date: Date; endDate: Date; dateStr: string; count: number; max: number; }[] = [];
 
   private getStatistic(prefiltered: DirectoryContent): { date: Date, endDate: Date, dateStr: string, count: number, max: number }[] {
@@ -260,11 +254,7 @@ export class FilterService {
         this.statistic = this.getStatistic(dirContent);
         return this.filterState.pipe(
           map((afilters) => {
-            if (
-              !dirContent ||
-              !dirContent.media ||
-              (!afilters.filtersVisible && !afilters.areFiltersActive)
-            ) {
+            if (!dirContent || !dirContent.media || (!afilters.filtersVisible && !afilters.areFiltersActive)) {
               return dirContent;
             }
 
@@ -287,10 +277,8 @@ export class FilterService {
                 Number.MIN_VALUE + 1
               );
               // Add a few sec padding
-              afilters.dateFilter.minDate -=
-                (afilters.dateFilter.minDate % 1000) + 1000;
-              afilters.dateFilter.maxDate +=
-                (afilters.dateFilter.maxDate % 1000) + 1000;
+              afilters.dateFilter.minDate -= (afilters.dateFilter.minDate % 1000) + 1000;
+              afilters.dateFilter.maxDate += (afilters.dateFilter.maxDate % 1000) + 1000;
 
               if (afilters.dateFilter.minFilter === Number.MIN_VALUE) {
                 afilters.dateFilter.minFilter = afilters.dateFilter.minDate;
@@ -312,11 +300,11 @@ export class FilterService {
               afilters.dateFilter.maxFilter = Number.MAX_VALUE;
             }
 
-            const filterValueCounts: {
-              [k in FilterType]?: Record<string, number | undefined>;
-            } = {};
+            function* filterAndBuildCounts() {
+              const filterValueCounts: {
+                [k in FilterType]?: Record<string, number | undefined>;
+              } = {};
 
-            function* doFilter() {
               for (const item of c.media) {
                 const filteredOut = afilters.selectedFilters.reduce(
                   (filteredOut, { type, options }) => {
@@ -326,11 +314,18 @@ export class FilterService {
 
                     for (const value of values) {
                       counts[value] = (counts[value] ?? 0) + 1;
-                      if (options.find(x => x.name === value) === undefined) {
-                        options.push({name: value, selected: true}); // Add any unknown values to the filter
+                      if (options.find((x) => x.name === value) === undefined) {
+                        options.push({ name: value, selected: true }); // Add any unknown values to the filter
                       }
                     }
-                    return filteredOut || (values.length > 0 && values.every((v) => !options.some(({name, selected}) => selected && name === v)));
+                    return (
+                      filteredOut ||
+                      (values.length > 0 &&
+                        !options.some(
+                          ({ name, selected }) =>
+                            selected && !values.includes(name)
+                        ))
+                    );
                   },
                   false
                 );
@@ -338,16 +333,23 @@ export class FilterService {
                   yield item;
                 }
               }
+              return filterValueCounts;
             }
 
-            c.media = [...doFilter()];
+            const [filteredMedia, filterValueCounts] = Utils.collect(
+              filterAndBuildCounts()
+            );
+
             afilters.filterValueCounts = filterValueCounts;
             afilters.areFiltersActive =
-              c.media.length !== dirContent.media.length;
+              filteredMedia.length !== dirContent.media.length;
             for (const filter of afilters.selectedFilters) {
-              filter.options = filter.options.filter((option) => filterValueCounts[filter.type]?.[option.name])
+              filter.options = filter.options.filter(
+                (option) => filterValueCounts[filter.type]?.[option.name]
+              );
             }
 
+            c.media = filteredMedia;
             return c;
           })
         );

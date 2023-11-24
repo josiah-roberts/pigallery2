@@ -179,7 +179,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
   };
 
   private onContentChange = (content: GroupedDirectoryContent): void => {
-    console.info('content changed', this.directoryContent?.mediaGroups)
     if (!content) {
       return;
     }
