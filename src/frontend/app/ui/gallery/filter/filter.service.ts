@@ -2,9 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { PhotoDTO } from '../../../../../common/entities/PhotoDTO';
 import { DirectoryContent } from '../contentLoader.service';
-import { debounceTime, map, switchMap } from 'rxjs/operators';
-import { Filters } from 'fluent-ffmpeg';
-import { debug } from 'console';
+import { map, switchMap } from 'rxjs/operators';
 
 export enum FilterRenderType {
   enum = 1,
@@ -347,15 +345,6 @@ export class FilterService {
               afilters.dateFilter.maxFilter = Number.MAX_VALUE;
             }
 
-            // this needs to:
-            // Build an array with all of the selected filter values for all of the media
-            // Build a map with the counts of all of the selected filter values for all of the media
-            // Build a map with all of the filter selections, including considering the unknown ones
-            // Finally, filter the media accordingly
-            // And update the filter selections with those defaults
-
-            // I think I can do *all* of this in one pass
-
             const filterValueCounts: {
               [k in FilterType]?: Record<string, number | undefined>;
             } = {};
@@ -374,8 +363,7 @@ export class FilterService {
                         options.push({name: value, selected: true}); // Add any unknown values to the filter
                       }
                     }
-                    return filteredOut || values.every((v) => !options.some(({name, selected}) => selected && name === v));
-                
+                    return filteredOut || (values.length > 0 && values.every((v) => !options.some(({name, selected}) => selected && name === v)));
                   },
                   false
                 );
